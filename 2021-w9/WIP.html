@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Women in Parliament</title>
+    <script src="https://d3js.org/d3.v4.js"></script>
+    <style>
+        circle:hover{
+            fill: #F8FFF4 !important;
+            opacity: 1;
+        }
+
+        .tooltip{
+            text-anchor: middle;
+            pointer-events: none;
+            display: none;
+        }
+
+        tspan{
+            text-anchor: start;
+            font-size: 12px;
+        }
+
+        tspan.country{
+            font-size: 20px;
+            font-weight: bold;
+            font-family: 'Times New Roman', Times, serif;
+            text-decoration: underline;
+        }
+
+        tspan.wip{
+            font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+            font-weight: bold;
+        }
+
+        .vizContainer{
+            border: 1px solid #666;
+            box-shadow: 2px 2px 2px 2px #999;
+            padding: 5px 10px;
+            width: 500px;
+            background: #fff;
+        }
+
+        .viz{
+            margin: auto;
+            width: 50%;
+        }
+
+        .vizDescription{
+            font-family: Helvetica;
+            font-size: 13px;
+            color: #222;
+        }
+
+        .vizFooter{
+            font-size: 14px;
+            color: #222;
+            border-top: 1px solid #666;
+        }
+
+        body{
+            background-color: #ddd;
+        }
+
+        p{
+            margin-top: 0px;
+            margin-bottom: 8px;
+        }
+
+        h2{
+            font-size: 24px;
+            margin: 5px 0px ;
+            padding-bottom: 2px; 
+            border-bottom: 1px solid #666;
+        }
+
+        .row {
+            display: flex;
+            border-bottom: 1px solid #666;
+        }
+
+        .column {
+            flex: 50%;
+            padding: 0px 10px;
+            text-align: justify;
+        }
+
+    </style>
+</head>
+<body>
+    <body>
+        <div class="viz">
+            <div class="vizContainer">
+                <div class="vizDescription">
+                    <h2>The Proportion of Seats held by Women in European Parliaments</h2>
+                    <div class="row">
+                    <p class="column">
+                    This chart shows the <span style="font-weight:bold; color: #0B7189">proportion of women in parliaments</span> across several European nations in <b>2019</b>. 
+                    While Sweden is the closest to covering the gender gap with 47% of seats going to women, <span style="font-weight:bold; color: #0B7189">many countries are still far from reaching equal gender</span></p>
+                    <p style="padding-bottom: 5px;" class="column">
+                    <span style="font-weight:bold; color: #0B7189;">representation</span>.<br><br>Each circle denotes a single country and its size is determined by the share of females in government.<b> Click the circles</b> for further details.</p>
+                    </div>
+                </div>
+                <div id="my_dataviz"></div>
+                <div class="vizFooter">
+                    <b>Data source:</b> Eurostat | 
+                    <b>Design:</b> Schubert de Abreu (@schubertda1)
+                </div>
+            </div>
+        </div>
+    
+        <script>
+
+        // set the dimensions and margins of the graph
+        var width = 500
+        var height = 400
+        
+        // append the svg object to the body of the page
+        var svg = d3.select("#my_dataviz")
+          .append("svg")
+            .attr("width", 500)
+            .attr("height", 400)
+        
+        d3.csv("wip_data.csv",
+            function(d){
+                return {country: d.country, perc:d.perc, perc2: d.perc, rank: d.rank}
+            },
+            drawViz)
+        
+
+        function drawViz(data){
+
+        // Ordinal color scale for circles
+        var colorScale = d3.scaleOrdinal()
+        .domain(d3.extent(data, d=> +d.perc))
+        .range(["#2b303a","#0B7189","#004e52","#888da7","#b1740f","#d1d0a3","#283044"])
+        
+        var node = svg.append("g")
+          .selectAll("circle.countries")
+          .data(data)
+          .enter()
+          .append("g")
+          .attr("class", d => "g-"+ d.country.split(" ")[0]) // Taking the first word only for country names with spaces
+          
+        var circles = node
+          .append("circle")
+            .attr("class","countries")
+            .attr("r", d => d.perc * 85)
+            .attr("cx", width / 2)
+            .attr("cy", height / 2)
+            .style("fill", d => colorScale(+d.perc))
+            .style("fill-opacity", 0.7)
+            .attr("stroke", "#d7d7d7")
+            .style("stroke-width", 2)
+            .on("click", function(d){
+                d3.select(this)
+                .transition()
+                .duration(200)
+                .attr("r",d => 75)
+
+                d.perc = 1;
+
+                simulation.force("forceY").initialize(data)
+                simulation.force("forceX").initialize(data)
+                simulation.force("center").initialize(data)
+                simulation.force("charge").initialize(data)
+                simulation.force("collide").initialize(data)
+                simulation.alphaTarget(.02).restart();
+
+                d3.select(".g-" + d.country.split(" ")[0] + " text")
+                    .style("display","block")
+        })
+            .on("mouseout", function(d){
+                d.perc = d.perc2
+                d3.select(this).attr("r",d => d.perc * 85)
+                simulation.force("forceX").initialize(data)
+                simulation.force("center").initialize(data)
+                simulation.force("charge").initialize(data)
+                simulation.force("collide").initialize(data)
+                simulation.alphaTarget(.02).restart();
+
+                d3.select(".g-" + d.country.split(" ")[0] + " text")
+                    .style("display","none")
+        })
+            .call(d3.drag()
+              .on("start", dragstarted)
+              .on("drag", dragged)
+              .on("end", dragended));
+
+        // Creating the tooltip
+        var tooltip = node
+            .append("text")
+            .attr("class", d=> "tooltip")
+            .attr("x", width / 2)
+            .attr("y", height / 2)
+
+        tooltip.append("tspan")
+            .attr("class", "country")
+            .html(d => { return createTooltipText(d)["header"] })
+            .attr("dx","-42px")
+            .attr("dy","-20px")
+
+        tooltip.append("tspan")
+            .attr("class", "wip")
+            .html(d => { return createTooltipText(d)["desc"].split("  ")[0] })
+            .attr("dx", d => -11 * createTooltipText(d)["header"].length - 10)
+            .attr("dy","20px")
+
+        tooltip.append("tspan")
+            .html(d => { return createTooltipText(d)["desc"].split("  ")[1] })
+            .attr("dx", "-120px")
+            .attr("dy","14px")
+
+        tooltip.append("tspan")
+            .attr("class", "wip")
+            .html(d => { return createTooltipText(d)["desc2"].split("  ")[0] })
+            .attr("dx", "-23px")
+            .attr("dy","20px")
+        
+        tooltip.append("tspan")
+            .html(d => { return " " + createTooltipText(d)["desc2"].split("  ")[1] })
+        
+        // Features of the forces applied to the nodes:
+        var simulation = d3.forceSimulation()
+            .force("forceX", d3.forceX().strength(d=> d.perc ).x(width / 2 ))
+            .force("forceY", d3.forceY().strength(d=> d.perc * 1.5).y(height / 2))
+            .force("center", d3.forceCenter().x(width / 2).y(height / 2)) // Attraction to the center of the svg area
+            .force("charge", d3.forceManyBody().strength(0.8)) // Nodes are attracted one each other of value is > 0
+            .force("collide", d3.forceCollide().strength(.03).radius(d => d.perc * 85 + 0.5 ).iterations(30)) // Force that avoids circle overlapping
+        
+        // Apply these forces to the nodes and the tooltip and update their positions.
+        simulation
+            .nodes(data)
+            .on("tick", function(d){
+                circles
+                  .attr("cx", function(d){ return d.x; })
+                  .attr("cy", function(d){ return d.y; })
+                tooltip
+                  .attr("x", function(d){ return d.x; })
+                  .attr("y", function(d){ return d.y; })
+            });
+        
+        // Helper function for tooltip text
+        function createTooltipText(d){
+            var header = d.country
+            var desc   = "Women in Parliament  " + Math.round(d.perc * 100, 2) + "%"
+            var desc2  = "Rank in EU -  " + d.rank
+            return {header, desc, desc2};
+        }
+        
+        // Functions for dragging of circles
+        function dragstarted(d) {
+            if (!d3.event.active) simulation.alphaTarget(.03).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+        function dragged(d) {
+            d.fx = d3.event.x;
+            d.fy = d3.event.y;
+        }
+        function dragended(d) {
+            if (!d3.event.active) simulation.alphaTarget(.03);
+            d.fx = null;
+            d.fy = null;
+        }
+    }
+
+    </script>
+    
+</body>
+</html>
